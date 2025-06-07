@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "exa": {
+      "type": "streamable-http",
+      "url": "https://mcp.exa.ai/mcp?exaApiKey=${OPENAI_API_KEY}",
+      "note": "For Streamable HTTP connections, add this URL directly in your MCP Client"
+    }
+  },
+  "instructions": "Answer the user's question using only the tools available."
+}
