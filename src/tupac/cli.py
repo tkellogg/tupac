@@ -5,6 +5,8 @@ from pathlib import Path
 from collections import OrderedDict
 from dataclasses import dataclass
 from typing import Any, Dict, List
+import os
+import re
 
 import openai
 import fastmcp
@@ -28,7 +30,13 @@ class Config:
 
     @classmethod
     def load(cls, path: Path) -> "Config":
-        data = json.loads(path.read_text())
+        text = path.read_text()
+        text = re.sub(
+            r"\${([A-Z0-9_]+)}",
+            lambda m: os.environ.get(m.group(1), m.group(0)),
+            text,
+        )
+        data = json.loads(text)
         return cls(
             system_prompt=data["system_prompt"],
             mcp_servers=data["mcp_servers"],
@@ -194,7 +202,10 @@ async def cli(config_path: Path, prompt: str) -> None:
 
 
 def main() -> None:
-    typer.run(cli)
+    def _run(config_path: Path, prompt: str) -> None:
+        asyncio.run(cli(config_path, prompt))
+
+    typer.run(_run)
 
 
 if __name__ == "__main__":

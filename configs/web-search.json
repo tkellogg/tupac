@@ -1,10 +1,12 @@
 {
-  "mcpServers": {
-    "exa": {
-      "type": "streamable-http",
-      "url": "https://mcp.exa.ai/mcp?exaApiKey=${OPENAI_API_KEY}",
-      "note": "For Streamable HTTP connections, add this URL directly in your MCP Client"
+  "system_prompt": "Use search to answer questions.",
+  "model": "gpt-4o",
+  "mcp_servers": [
+    {
+      "type": "url",
+      "url": "https://api.exa.ai/mcp/sse",
+      "name": "exa-search",
+      "authorization_token": "${EXA_KEY}"
     }
-  },
-  "instructions": "Answer the user's question using only the tools available."
+  ]
 }

@@ -102,3 +102,14 @@ async def test_tool_error():
         isinstance(m, dict) and m.get("type") == "function_call_output" and m.get("is_error")
         for m in messages
     )
+
+
+def test_config_env(tmp_path, monkeypatch):
+    data = '{"system_prompt": "${SYS}", "mcp_servers": [], "model": "${MOD}"}'
+    path = tmp_path / "cfg.json"
+    path.write_text(data)
+    monkeypatch.setenv("SYS", "sys")
+    monkeypatch.setenv("MOD", "test-model")
+    cfg = Config.load(path)
+    assert cfg.system_prompt == "sys"
+    assert cfg.model == "test-model"
