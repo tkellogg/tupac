@@ -1,8 +1,11 @@
 import asyncio
 from pathlib import Path
 import pytest
+import os
+import openai
 
 from tupac.cli import Config, conversation_loop, ResourceCache
+import fastmcp
 
 
 class DummyMCP:
@@ -115,5 +118,25 @@ def test_config_env(tmp_path, monkeypatch):
 
 def test_load_example_config():
     cfg = Config.load(Path("configs/web-search.json"))
+    fastmcp.Client({"mcpServers": cfg.to_fastmcp()})
     assert cfg.system_prompt
     assert cfg.mcp_servers
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif("OPENAI_API_KEY" not in os.environ, reason="needs API key")
+async def test_openai_integration():
+    cfg = Config(system_prompt="Say hi", mcp_servers={})
+    messages = [
+        {"role": "system", "content": cfg.system_prompt},
+        {"role": "user", "content": "Hello"},
+    ]
+    client = openai.AsyncOpenAI()
+    await conversation_loop(
+        client,
+        fastmcp.Client({"mcpServers": cfg.to_fastmcp()}),
+        cfg,
+        messages,
+        ResourceCache(),
+    )
+    assert len(messages) > 2

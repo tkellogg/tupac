@@ -8,7 +8,8 @@ tupac config.json "Hello"
 ```
 
 Configuration files may contain `${VARNAME}` placeholders which are expanded
-from the environment before parsing. See `configs/web-search.json` for an
+from the environment before parsing. Environment variables can also be loaded
+from a `.env` file via `python-dotenv`. See `configs/web-search.json` for an
 example using `${EXA_API_KEY}`.
 
 Configuration format follows the standard MCP schema:
@@ -19,9 +20,10 @@ Configuration format follows the standard MCP schema:
   "model": "gpt-4o",
   "mcpServers": {
     "exa": {
-      "type": "streamable-http",
-      "url": "https://mcp.exa.ai/mcp?exaApiKey=${EXA_API_KEY}",
-      "note": "For Streamable HTTP connections, add this URL directly in your MCP Client"
+      "type": "url",
+      "url": "https://api.exa.ai/mcp/sse",
+      "name": "exa-search",
+      "authorization_token": "${EXA_API_KEY}"
     }
   }
 }

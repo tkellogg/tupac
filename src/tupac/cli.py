@@ -10,6 +10,7 @@ import re
 
 import openai
 import fastmcp
+from dotenv import load_dotenv
 import asyncio
 import typer
 from rich.console import Console
@@ -41,6 +42,24 @@ class Config:
             or {},
             model=data.get("model", "gpt-4o"),
         )
+
+    def to_fastmcp(self) -> Dict[str, Dict[str, Any]]:
+        out: Dict[str, Dict[str, Any]] = {}
+        for name, server in self.mcp_servers.items():
+            if server.get("type") == "url":
+                headers = {}
+                token = server.get("authorization_token")
+                if token:
+                    headers["authorization"] = token
+                entry = {"url": server["url"]}
+                if headers:
+                    entry["headers"] = headers
+                if transport := server.get("transport"):
+                    entry["transport"] = transport
+                out[name] = entry
+            else:
+                out[name] = server
+        return out
 
 
 class ResourceCache:
@@ -188,9 +207,10 @@ async def conversation_loop(
 
 async def cli(config_path: Path, prompt: str) -> None:
     """Run tupac with CONFIG_PATH and PROMPT."""
+    load_dotenv()
     cfg = Config.load(config_path)
     client = openai.AsyncOpenAI()
-    mcp = fastmcp.Client({"mcpServers": cfg.mcp_servers})
+    mcp = fastmcp.Client({"mcpServers": cfg.to_fastmcp()})
 
     messages = [
         {"role": "system", "content": cfg.system_prompt},

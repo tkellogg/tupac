@@ -10,6 +10,7 @@ requires-python = ">=3.12"
 dependencies = [
     "fastmcp>=2.7.0",
     "openai>=1.84.0",
+    "python-dotenv>=1.1.0",
     "rich>=14.0.0",
     "typer>=0.16.0",
 ]
