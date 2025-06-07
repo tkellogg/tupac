@@ -102,15 +102,23 @@ async def build_tools(mcp: fastmcp.Client) -> List[dict]:
         schema = dict(t.inputSchema or {})
         # ensure minimal JSON Schema validity for OpenAI
         schema.setdefault("type", "object")
-        if "required" not in schema:
-            schema["required"] = list(schema.get("properties", {}).keys())
+        
+        # Fix required field validation - ensure all properties are in required array
+        properties = schema.get("properties", {})
+        existing_required = schema.get("required", [])
+        all_properties = list(properties.keys())
+        
+        # Use all properties as required if existing required is incomplete
+        schema["required"] = all_properties if all_properties else existing_required
+        
         tools.append(
             {
                 "type": "function",
-                "name": t.name,
-                "description": t.description,
-                "parameters": schema,
-                "strict": True,
+                "function": {
+                    "name": t.name,
+                    "description": t.description,
+                    "parameters": schema,
+                }
             }
         )
     return tools
@@ -125,9 +133,9 @@ async def fetch_response(
     delay = 1.0
     for attempt in range(3):
         try:
-            return await client.responses.create(
+            return await client.chat.completions.create(
                 model=cfg.model,
-                input=messages,
+                messages=messages,
                 tools=tools,
                 stream=False,
             )
@@ -161,24 +169,23 @@ async def conversation_loop(
 
         resp = await fetch_response(client, cfg, messages, tools)
 
-        tool_called = False
-        for item in resp.output:
-            messages.append(item)
-            if getattr(item, "type", None) == "function_call":
-                tool_called = True
-                console.print(f"Tool call: {item.name}", style="yellow")
+        response_message = resp.choices[0].message
+        messages.append(response_message)
+        
+        if response_message.tool_calls:
+            for tool_call in response_message.tool_calls:
+                console.print(f"Tool call: {tool_call.function.name}", style="yellow")
                 try:
                     result = await mcp.call_tool(
-                        item.name,
-                        json.loads(getattr(item, "arguments", "{}")),
+                        tool_call.function.name,
+                        json.loads(tool_call.function.arguments),
                     )
                     console.print(str(result), style="magenta")
                     messages.append(
                         {
-                            "type": "function_call_output",
-                            "tool_use_id": item.id,
-                            "is_error": False,
-                            "content": result,
+                            "role": "tool",
+                            "tool_call_id": tool_call.id,
+                            "content": str(result),
                         }
                     )
                     if isinstance(result, dict) and {
@@ -196,35 +203,13 @@ async def conversation_loop(
                 except fastmcp.exceptions.ClientError as exc:
                     messages.append(
                         {
-                            "type": "function_call_output",
-                            "tool_use_id": item.id,
-                            "is_error": True,
+                            "role": "tool",
+                            "tool_call_id": tool_call.id,
                             "content": str(exc),
                         }
                     )
-            elif getattr(item, "type", None) == "reasoning":
-                text = " ".join(s.text for s in getattr(item, "summary", []))
-                console.print(text, style="grey42")
-            elif getattr(item, "type", None) == "message":
-                parts: List[str] = []
-                for c in getattr(item, "content", []):
-                    if c.get("type") == "output_text":
-                        parts.append(c.get("text", ""))
-                    elif c.get("type") in BINARY_TYPES:
-                        data = c.get("data", b"")
-                        if isinstance(data, str):
-                            data = data.encode()
-                        path = save_blob(
-                            data, c.get("mime_type", "application/octet-stream")
-                        )
-                        parts.append(f"[binary saved to {path.name}]")
-                console.print("".join(parts), style="cyan")
-                return
-            else:
-                console.print(str(item), style="magenta")
-                return
-
-        if not tool_called:
+        else:
+            console.print(response_message.content, style="cyan")
             return
 
 
@@ -233,6 +218,17 @@ async def cli(config_path: Path, prompt: str) -> None:
     load_dotenv()
     cfg = Config.load(config_path)
     client = openai.AsyncOpenAI()
+    
+    # Handle configs without MCP servers
+    if not cfg.mcp_servers:
+        messages = [
+            {"role": "system", "content": cfg.system_prompt},
+            {"role": "user", "content": prompt},
+        ]
+        resp = await fetch_response(client, cfg, messages, [])
+        console.print(resp.choices[0].message.content, style="cyan")
+        return
+    
     mcp = fastmcp.Client({"mcpServers": cfg.to_fastmcp()})
     async with mcp:
         tools = await build_tools(mcp)
@@ -246,10 +242,13 @@ async def cli(config_path: Path, prompt: str) -> None:
 
 
 def main() -> None:
+    app = typer.Typer(pretty_exceptions_enable=False)
+
+    @app.command()
     def _run(config_path: Path, prompt: str) -> None:
         asyncio.run(cli(config_path, prompt))
 
-    typer.run(_run)
+    app()
 
 
 if __name__ == "__main__":
