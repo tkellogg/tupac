@@ -41,7 +41,14 @@ async def test_conversation_simple():
         {"role": "system", "content": cfg.system_prompt},
         {"role": "user", "content": "Hello"},
     ]
-    await conversation_loop(client, DummyMCP(), cfg, messages, ResourceCache())
+    await conversation_loop(
+        client,
+        DummyMCP(),
+        cfg,
+        messages,
+        [],
+        ResourceCache(),
+    )
     assert len(messages) > 2
 
 
@@ -77,7 +84,14 @@ async def test_tool_success():
         {"role": "system", "content": "you"},
         {"role": "user", "content": "call"},
     ]
-    await conversation_loop(client, SuccessMCP(), cfg, messages, ResourceCache())
+    await conversation_loop(
+        client,
+        SuccessMCP(),
+        cfg,
+        messages,
+        [],
+        ResourceCache(),
+    )
     assert any(
         isinstance(m, dict)
         and m.get("type") == "function_call_output"
@@ -98,7 +112,14 @@ async def test_tool_error():
         {"role": "system", "content": "you"},
         {"role": "user", "content": "call"},
     ]
-    await conversation_loop(client, ErrorMCP(), cfg, messages, ResourceCache())
+    await conversation_loop(
+        client,
+        ErrorMCP(),
+        cfg,
+        messages,
+        [],
+        ResourceCache(),
+    )
     assert any(
         isinstance(m, dict) and m.get("type") == "function_call_output" and m.get("is_error")
         for m in messages
@@ -118,7 +139,8 @@ def test_config_env(tmp_path, monkeypatch):
 
 def test_load_example_config():
     cfg = Config.load(Path("configs/web-search.json"))
-    fastmcp.Client({"mcpServers": cfg.to_fastmcp()})
+    if cfg.to_fastmcp():
+        fastmcp.Client({"mcpServers": cfg.to_fastmcp()})
     assert cfg.system_prompt
     assert cfg.mcp_servers
 
@@ -134,9 +156,10 @@ async def test_openai_integration():
     client = openai.AsyncOpenAI()
     await conversation_loop(
         client,
-        fastmcp.Client({"mcpServers": cfg.to_fastmcp()}),
+        DummyMCP(),
         cfg,
         messages,
+        [],
         ResourceCache(),
     )
     assert len(messages) > 2

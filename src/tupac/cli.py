@@ -98,7 +98,10 @@ class ResourceCache:
 
 
 async def fetch_response(
-    client: openai.AsyncOpenAI, cfg: Config, messages: List[Any]
+    client: openai.AsyncOpenAI,
+    cfg: Config,
+    messages: List[Any],
+    tools: List[dict],
 ) -> Any:
     delay = 1.0
     for attempt in range(3):
@@ -106,7 +109,7 @@ async def fetch_response(
             return await client.responses.create(
                 model=cfg.model,
                 input=messages,
-                mcp_servers=cfg.mcp_servers,
+                tools=tools,
                 stream=False,
             )
         except Exception:
@@ -130,13 +133,14 @@ async def conversation_loop(
     mcp: fastmcp.Client,
     cfg: Config,
     messages: List[Any],
+    tools: List[dict],
     cache: ResourceCache,
 ) -> None:
     while True:
         for block in cache.consume_changed_blocks():
             messages.append({"role": "user", "content": block})
 
-        resp = await fetch_response(client, cfg, messages)
+        resp = await fetch_response(client, cfg, messages, tools)
 
         tool_called = False
         for item in resp.output:
@@ -211,13 +215,24 @@ async def cli(config_path: Path, prompt: str) -> None:
     cfg = Config.load(config_path)
     client = openai.AsyncOpenAI()
     mcp = fastmcp.Client({"mcpServers": cfg.to_fastmcp()})
+    async with mcp:
+        tools = [
+            {
+                "type": "function",
+                "name": t.name,
+                "description": t.description,
+                "parameters": t.inputSchema,
+                "strict": True,
+            }
+            for t in await mcp.list_tools()
+        ]
 
-    messages = [
-        {"role": "system", "content": cfg.system_prompt},
-        {"role": "user", "content": prompt},
-    ]
+        messages = [
+            {"role": "system", "content": cfg.system_prompt},
+            {"role": "user", "content": prompt},
+        ]
 
-    await conversation_loop(client, mcp, cfg, messages, ResourceCache())
+        await conversation_loop(client, mcp, cfg, messages, tools, ResourceCache())
 
 
 def main() -> None:
