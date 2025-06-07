@@ -36,8 +36,17 @@ Configuration format follows the standard MCP schema:
 }
 ```
 
-You can use that `${EXA_API_KEY}` syntax to reference environment variables. It
-does load [`.env` files][env].
+### Environment Variables
+You can use that `${EXA_API_KEY}` syntax to reference environment variables in the config file. It
+does load [`.env` files][env], but it loads it from the current directory, wherever you are.
+
+Required environment variables
+* `OPENAI_API_KEY`
+
+Variables required to run `configs/web-search.json`:
+* `EXA_API_KEY` — find it [here](https://docs.exa.ai/reference/getting-started)
+
+Happy building!
 
  [api]: https://platform.openai.com/docs/api-reference/responses
  [env]: https://pypi.org/project/python-dotenv/

@@ -10,10 +10,10 @@ import re
 
 import openai
 import fastmcp
-from dotenv import load_dotenv
 import asyncio
 import typer
 from rich.console import Console
+
 
 console = Console()
 
@@ -221,7 +221,9 @@ async def conversation_loop(
 
 async def cli(config_path: Path, prompt: str, verbose: bool = False) -> None:
     """Run tupac with CONFIG_PATH and PROMPT."""
-    load_dotenv()
+    from dotenv import load_dotenv, find_dotenv
+    load_dotenv(find_dotenv(usecwd=True))
+
     cfg = Config.load(config_path)
     client = openai.AsyncOpenAI()
     
