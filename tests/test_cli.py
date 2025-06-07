@@ -1,0 +1,104 @@
+import os
+import asyncio
+import pytest
+import openai
+
+from tupac.cli import Config, conversation_loop, ResourceCache
+
+
+class DummyMCP:
+    async def call_tool(self, name: str, args: dict) -> dict:
+        raise RuntimeError("tool call not expected")
+
+
+class SuccessMCP:
+    async def call_tool(self, name: str, args: dict) -> dict:
+        return {
+            "uri": "tool://result",
+            "title": "Result",
+            "type": "text",
+            "text": f"echo {args.get('text', '')}",
+        }
+
+
+class ErrorMCP:
+    async def call_tool(self, name: str, args: dict) -> dict:
+        from fastmcp.exceptions import ClientError
+
+        raise ClientError("boom")
+
+
+@pytest.mark.asyncio
+async def test_conversation_simple():
+    if not os.getenv("OPENAI_API_KEY"):
+        pytest.skip("OPENAI_API_KEY not set")
+    cfg = Config(
+        system_prompt="You are a helpful assistant.", mcp_servers=[], model="gpt-4o"
+    )
+    client = openai.AsyncOpenAI()
+    messages = [
+        {"role": "system", "content": cfg.system_prompt},
+        {"role": "user", "content": "Hello"},
+    ]
+    await conversation_loop(client, DummyMCP(), cfg, messages, ResourceCache())
+    assert len(messages) > 2
+
+
+class DummyItem:
+    def __init__(self, **kw) -> None:
+        for k, v in kw.items():
+            setattr(self, k, v)
+
+
+class DummyResponse:
+    def __init__(self, items):
+        self.output = items
+
+
+class DummyClient:
+    def __init__(self, items):
+        self._items = items
+        self.responses = self
+
+    async def create(self, *args, **kwargs):
+        return DummyResponse(self._items)
+
+
+@pytest.mark.asyncio
+async def test_tool_success():
+    items = [
+        DummyItem(type="function_call", id="1", name="echo", arguments='{"text": "hi"}'),
+        DummyItem(type="message", content=[{"type": "output_text", "text": "done"}]),
+    ]
+    client = DummyClient(items)
+    cfg = Config(system_prompt="you", mcp_servers=[])
+    messages = [
+        {"role": "system", "content": "you"},
+        {"role": "user", "content": "call"},
+    ]
+    await conversation_loop(client, SuccessMCP(), cfg, messages, ResourceCache())
+    assert any(
+        isinstance(m, dict)
+        and m.get("type") == "function_call_output"
+        and not m.get("is_error")
+        for m in messages
+    )
+
+
+@pytest.mark.asyncio
+async def test_tool_error():
+    items = [
+        DummyItem(type="function_call", id="1", name="echo", arguments='{"text": "hi"}'),
+        DummyItem(type="message", content=[{"type": "output_text", "text": "done"}]),
+    ]
+    client = DummyClient(items)
+    cfg = Config(system_prompt="you", mcp_servers=[])
+    messages = [
+        {"role": "system", "content": "you"},
+        {"role": "user", "content": "call"},
+    ]
+    await conversation_loop(client, ErrorMCP(), cfg, messages, ResourceCache())
+    assert any(
+        isinstance(m, dict) and m.get("type") == "function_call_output" and m.get("is_error")
+        for m in messages
+    )

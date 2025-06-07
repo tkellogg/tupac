@@ -1,0 +1,22 @@
+[project]
+name = "tupac"
+version = "0.1.0"
+description = "A basic LLM wrapper CLI with proper MCP tool & resource support"
+readme = "README.md"
+authors = [
+    { name = "Tim Kellogg", email = "timothy.kellogg@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "fastmcp>=2.7.0",
+    "openai>=1.84.0",
+    "rich>=14.0.0",
+    "typer>=0.16.0",
+]
+
+[project.scripts]
+tupac = "tupac.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
