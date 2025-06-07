@@ -162,6 +162,7 @@ async def conversation_loop(
     messages: List[Any],
     tools: List[dict],
     cache: ResourceCache,
+    verbose: bool = False,
 ) -> None:
     while True:
         for block in cache.consume_changed_blocks():
@@ -172,15 +173,20 @@ async def conversation_loop(
         response_message = resp.choices[0].message
         messages.append(response_message)
         
+        # Show reasoning if available
+        if hasattr(response_message, 'reasoning') and response_message.reasoning:
+            console.print(response_message.reasoning, style="grey42")
+        
         if response_message.tool_calls:
             for tool_call in response_message.tool_calls:
-                console.print(f"Tool call: {tool_call.function.name}", style="yellow")
+                console.print(f"Tool call: {tool_call.function.name}({tool_call.function.arguments})", style="yellow")
                 try:
                     result = await mcp.call_tool(
                         tool_call.function.name,
                         json.loads(tool_call.function.arguments),
                     )
-                    console.print(str(result), style="magenta")
+                    if verbose:
+                        console.print(str(result), style="magenta")
                     messages.append(
                         {
                             "role": "tool",
@@ -213,7 +219,7 @@ async def conversation_loop(
             return
 
 
-async def cli(config_path: Path, prompt: str) -> None:
+async def cli(config_path: Path, prompt: str, verbose: bool = False) -> None:
     """Run tupac with CONFIG_PATH and PROMPT."""
     load_dotenv()
     cfg = Config.load(config_path)
@@ -238,15 +244,19 @@ async def cli(config_path: Path, prompt: str) -> None:
             {"role": "user", "content": prompt},
         ]
 
-        await conversation_loop(client, mcp, cfg, messages, tools, ResourceCache())
+        await conversation_loop(client, mcp, cfg, messages, tools, ResourceCache(), verbose)
 
 
 def main() -> None:
     app = typer.Typer(pretty_exceptions_enable=False)
 
     @app.command()
-    def _run(config_path: Path, prompt: str) -> None:
-        asyncio.run(cli(config_path, prompt))
+    def _run(
+        config_path: Path, 
+        prompt: str,
+        verbose: bool = typer.Option(False, "--verbose", "-v", help="Show tool call results")
+    ) -> None:
+        asyncio.run(cli(config_path, prompt, verbose))
 
     app()
 

@@ -1,10 +1,19 @@
 # tupac
-A terminal MCP client based on the OpenAI responses API.
+A GPT wrapper with MCP support. It's a thin layer around the OpenAI [responses][api] API
+with functions being specified as MCP config.
 
-## Usage
+You can write a simple "LLM app" very quickly, by specifying MCP config and a system prompt.
+
+MCP functionality supported:
+* ✅ tools
+* ✅ resources — but only as far as they're being returned from tools. No listing or fetching.
+
+Nothing else. It's what I consider to be an absolute [bare-bones][blog] MCP app.
+
+## Usage: LLM app
 
 ```bash
-tupac config.json "Hello"
+uvx tupac configs/web-search.json "When are we getting to Mars?"
 ```
 
 Configuration files may contain `${VARNAME}` placeholders which are expanded
@@ -16,15 +25,20 @@ Configuration format follows the standard MCP schema:
 
 ```json
 {
-  "instructions": "You are a helpful assistant.",
-  "model": "gpt-4o",
+  "instructions": "Use search to answer questions.",
+  "model": "o3",
   "mcpServers": {
     "exa": {
       "type": "url",
-      "url": "https://api.exa.ai/mcp/sse",
-      "name": "exa-search",
-      "authorization_token": "${EXA_API_KEY}"
+      "url": "https://mcp.exa.ai/mcp?exaApiKey=${EXA_API_KEY}"
     }
   }
 }
 ```
+
+You can use that `${EXA_API_KEY}` syntax to reference environment variables. It
+does load [`.env` files][env].
+
+ [api]: https://platform.openai.com/docs/api-reference/responses
+ [env]: https://pypi.org/project/python-dotenv/
+ [blog]: https://timkellogg.me/blog/2025/06/05/mcp-resources

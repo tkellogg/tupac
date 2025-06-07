@@ -1,6 +1,6 @@
 {
   "instructions": "Use search to answer questions.",
-  "model": "gpt-4o",
+  "model": "o3",
   "mcpServers": {
     "exa": {
       "type": "url",
