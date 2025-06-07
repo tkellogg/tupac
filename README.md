@@ -16,6 +16,14 @@ Nothing else. It's what I consider to be an absolute [bare-bones][blog] MCP app.
 uvx tupac configs/web-search.json "When are we getting to Mars?"
 ```
 
+You can get the config file by cloning the repo, or just copy/paste, or make your own.
+
+It's not a bad idea to add a bash alias for some of these:
+
+```bash
+alias ws-agent="uvx tupac ~/.config/tupac/web-search.json"
+```
+
 Configuration files may contain `${VARNAME}` placeholders which are expanded
 from the environment before parsing. Environment variables can also be loaded
 from a `.env` file via `python-dotenv`. See `configs/web-search.json` for an
