@@ -32,9 +32,7 @@ class ErrorMCP:
 
 @pytest.mark.asyncio
 async def test_conversation_simple():
-    items = [
-        DummyItem(type="message", content=[{"type": "output_text", "text": "hi"}])
-    ]
+    items = [DummyItem(type="message", content=[{"type": "output_text", "text": "hi"}])]
     client = DummyClient(items)
     cfg = Config(system_prompt="You are a helpful assistant.", mcp_servers={})
     messages = [
@@ -75,7 +73,9 @@ class DummyClient:
 @pytest.mark.asyncio
 async def test_tool_success():
     items = [
-        DummyItem(type="function_call", id="1", name="echo", arguments='{"text": "hi"}'),
+        DummyItem(
+            type="function_call", id="1", name="echo", arguments='{"text": "hi"}'
+        ),
         DummyItem(type="message", content=[{"type": "output_text", "text": "done"}]),
     ]
     client = DummyClient(items)
@@ -103,7 +103,9 @@ async def test_tool_success():
 @pytest.mark.asyncio
 async def test_tool_error():
     items = [
-        DummyItem(type="function_call", id="1", name="echo", arguments='{"text": "hi"}'),
+        DummyItem(
+            type="function_call", id="1", name="echo", arguments='{"text": "hi"}'
+        ),
         DummyItem(type="message", content=[{"type": "output_text", "text": "done"}]),
     ]
     client = DummyClient(items)
@@ -121,7 +123,9 @@ async def test_tool_error():
         ResourceCache(),
     )
     assert any(
-        isinstance(m, dict) and m.get("type") == "function_call_output" and m.get("is_error")
+        isinstance(m, dict)
+        and m.get("type") == "function_call_output"
+        and m.get("is_error")
         for m in messages
     )
 
@@ -160,7 +164,9 @@ async def test_build_tools_missing_required(monkeypatch):
             ]
 
     tools = await build_tools(MCPT())
-    assert tools[0]["parameters"]["required"] == ["a"]
+    params = tools[0]["parameters"]
+    assert params["required"] == ["a"]
+    assert params["type"] == "object"
 
 
 @pytest.mark.asyncio

@@ -37,9 +37,7 @@ class Config:
         data = json.loads(text)
         return cls(
             system_prompt=data.get("system_prompt") or data.get("instructions"),
-            mcp_servers=data.get("mcp_servers")
-            or data.get("mcpServers")
-            or {},
+            mcp_servers=data.get("mcp_servers") or data.get("mcpServers") or {},
             model=data.get("model", "gpt-4o"),
         )
 
@@ -98,9 +96,12 @@ class ResourceCache:
 
 
 async def build_tools(mcp: fastmcp.Client) -> List[dict]:
+    """Return tool definitions compatible with the OpenAI Responses API."""
     tools: List[dict] = []
     for t in await mcp.list_tools():
         schema = dict(t.inputSchema or {})
+        # ensure minimal JSON Schema validity for OpenAI
+        schema.setdefault("type", "object")
         if "required" not in schema:
             schema["required"] = list(schema.get("properties", {}).keys())
         tools.append(
