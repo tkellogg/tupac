@@ -1,7 +1,6 @@
-import os
 import asyncio
+from pathlib import Path
 import pytest
-import openai
 
 from tupac.cli import Config, conversation_loop, ResourceCache
 
@@ -30,12 +29,11 @@ class ErrorMCP:
 
 @pytest.mark.asyncio
 async def test_conversation_simple():
-    if not os.getenv("OPENAI_API_KEY"):
-        pytest.skip("OPENAI_API_KEY not set")
-    cfg = Config(
-        system_prompt="You are a helpful assistant.", mcp_servers=[], model="gpt-4o"
-    )
-    client = openai.AsyncOpenAI()
+    items = [
+        DummyItem(type="message", content=[{"type": "output_text", "text": "hi"}])
+    ]
+    client = DummyClient(items)
+    cfg = Config(system_prompt="You are a helpful assistant.", mcp_servers=[])
     messages = [
         {"role": "system", "content": cfg.system_prompt},
         {"role": "user", "content": "Hello"},
@@ -113,3 +111,9 @@ def test_config_env(tmp_path, monkeypatch):
     cfg = Config.load(path)
     assert cfg.system_prompt == "sys"
     assert cfg.model == "test-model"
+
+
+def test_load_example_config():
+    cfg = Config.load(Path("configs/web-search.json"))
+    assert cfg.system_prompt
+    assert cfg.mcp_servers

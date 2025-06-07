@@ -31,11 +31,8 @@ class Config:
     @classmethod
     def load(cls, path: Path) -> "Config":
         text = path.read_text()
-        text = re.sub(
-            r"\${([A-Z0-9_]+)}",
-            lambda m: os.environ.get(m.group(1), m.group(0)),
-            text,
-        )
+        pattern = re.compile(r"\$\{([A-Za-z0-9_]+)\}")
+        text = pattern.sub(lambda m: os.environ.get(m.group(1), m.group(0)), text)
         data = json.loads(text)
         return cls(
             system_prompt=data["system_prompt"],
