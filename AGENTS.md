@@ -1,11 +1,11 @@
-**Spec for “caleb” — a CLI MCP ↔ OpenAI Responses bridge**
+**Spec for “tupac” — a CLI MCP ↔ OpenAI Responses bridge**
 (latest deps, quoting your brief)
 
 ---
 
 > *“i want to build a CLI MCP client app. python, uv, FastMCP, typer, on the openai responses API”*
 
-* Name the package **caleb**.
+* Name the package **tupac**.
 * Latest libs (all installed with `uv add`):
 
   * `openai` @ latest (o-series ready)
@@ -18,7 +18,7 @@
 
 > *“the CLI takes a JSON file and a prompt. the JSON configures MCP servers and a system prompt. the app is a simple loop that…”*
 
-CLI (`caleb run cfg.json "prompt"`):
+CLI (`tupac run cfg.json "prompt"`):
 
 1. **Load config** (`system_prompt`, `mcp_servers`, model, etc.).
 2. Construct **`mcp_servers`** array **exactly** as in Claude’s MCP connector docs ([docs.anthropic.com][3]).
@@ -70,7 +70,7 @@ FastMCP now exposes `Tool.model_json_schema()`; embed that JSON Schema untouched
 
 > *“handle all MCP data types properly…”*
 
-| MCP content                                                                     | How **caleb** returns it                                                                                                                            |
+| MCP content                                                                     | How **tupac** returns it                                                                                                                            |
 | ------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `TextContent`                                                                   | inline text                                                                                                                                         |
 | `ImageContent`, `PdfContent`, `AudioContent`, `VideoContent`, any `BlobContent` | **print only the generated file-name** (e.g. `out_2025-06-07T12-00-01.png`) and tell the human “open this file to view”; save bytes to `./outputs/` |
@@ -144,7 +144,7 @@ The search tool then mirrors the POST `/search` endpoint documented here ([docs.
 
 ---
 
-> *“keeps cycling until there’s no tool calls left”* — caleb follows exactly that loop, with robust error propagation, grey chain-of-thought, and latest libraries throughout.
+> *“keeps cycling until there’s no tool calls left”* — tupac follows exactly that loop, with robust error propagation, grey chain-of-thought, and latest libraries throughout.
 
 [1]: https://gofastmcp.com/clients/client "Client Overview - FastMCP"
 [2]: https://typer.tiangolo.com/tutorial/printing/?utm_source=chatgpt.com "Printing and Colors - Typer"
