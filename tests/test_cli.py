@@ -33,7 +33,7 @@ async def test_conversation_simple():
         DummyItem(type="message", content=[{"type": "output_text", "text": "hi"}])
     ]
     client = DummyClient(items)
-    cfg = Config(system_prompt="You are a helpful assistant.", mcp_servers=[])
+    cfg = Config(system_prompt="You are a helpful assistant.", mcp_servers={})
     messages = [
         {"role": "system", "content": cfg.system_prompt},
         {"role": "user", "content": "Hello"},
@@ -69,7 +69,7 @@ async def test_tool_success():
         DummyItem(type="message", content=[{"type": "output_text", "text": "done"}]),
     ]
     client = DummyClient(items)
-    cfg = Config(system_prompt="you", mcp_servers=[])
+    cfg = Config(system_prompt="you", mcp_servers={})
     messages = [
         {"role": "system", "content": "you"},
         {"role": "user", "content": "call"},
@@ -90,7 +90,7 @@ async def test_tool_error():
         DummyItem(type="message", content=[{"type": "output_text", "text": "done"}]),
     ]
     client = DummyClient(items)
-    cfg = Config(system_prompt="you", mcp_servers=[])
+    cfg = Config(system_prompt="you", mcp_servers={})
     messages = [
         {"role": "system", "content": "you"},
         {"role": "user", "content": "call"},
@@ -103,7 +103,7 @@ async def test_tool_error():
 
 
 def test_config_env(tmp_path, monkeypatch):
-    data = '{"system_prompt": "${SYS}", "mcp_servers": [], "model": "${MOD}"}'
+    data = '{"instructions": "${SYS}", "mcpServers": {}, "model": "${MOD}"}'
     path = tmp_path / "cfg.json"
     path.write_text(data)
     monkeypatch.setenv("SYS", "sys")

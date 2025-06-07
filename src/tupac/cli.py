@@ -25,7 +25,7 @@ BINARY_TYPES = {"image", "pdf", "audio", "video", "blob"}
 @dataclass
 class Config:
     system_prompt: str
-    mcp_servers: List[Dict[str, Any]]
+    mcp_servers: Dict[str, Dict[str, Any]]
     model: str = "gpt-4o"
 
     @classmethod
@@ -35,8 +35,10 @@ class Config:
         text = pattern.sub(lambda m: os.environ.get(m.group(1), m.group(0)), text)
         data = json.loads(text)
         return cls(
-            system_prompt=data["system_prompt"],
-            mcp_servers=data["mcp_servers"],
+            system_prompt=data.get("system_prompt") or data.get("instructions"),
+            mcp_servers=data.get("mcp_servers")
+            or data.get("mcpServers")
+            or {},
             model=data.get("model", "gpt-4o"),
         )
 
