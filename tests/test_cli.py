@@ -4,7 +4,7 @@ import pytest
 import os
 import openai
 
-from tupac.cli import Config, conversation_loop, ResourceCache
+from tupac.cli import Config, conversation_loop, ResourceCache, build_tools
 import fastmcp
 
 
@@ -143,6 +143,24 @@ def test_load_example_config():
         fastmcp.Client({"mcpServers": cfg.to_fastmcp()})
     assert cfg.system_prompt
     assert cfg.mcp_servers
+
+
+@pytest.mark.asyncio
+async def test_build_tools_missing_required(monkeypatch):
+    from mcp.types import Tool
+
+    class MCPT:
+        async def list_tools(self):
+            return [
+                Tool(
+                    name="t",
+                    description="d",
+                    inputSchema={"properties": {"a": {"type": "string"}}},
+                )
+            ]
+
+    tools = await build_tools(MCPT())
+    assert tools[0]["parameters"]["required"] == ["a"]
 
 
 @pytest.mark.asyncio

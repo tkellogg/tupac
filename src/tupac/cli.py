@@ -97,6 +97,24 @@ class ResourceCache:
         return list(self.xml_blocks())
 
 
+async def build_tools(mcp: fastmcp.Client) -> List[dict]:
+    tools: List[dict] = []
+    for t in await mcp.list_tools():
+        schema = dict(t.inputSchema or {})
+        if "required" not in schema:
+            schema["required"] = list(schema.get("properties", {}).keys())
+        tools.append(
+            {
+                "type": "function",
+                "name": t.name,
+                "description": t.description,
+                "parameters": schema,
+                "strict": True,
+            }
+        )
+    return tools
+
+
 async def fetch_response(
     client: openai.AsyncOpenAI,
     cfg: Config,
@@ -216,16 +234,7 @@ async def cli(config_path: Path, prompt: str) -> None:
     client = openai.AsyncOpenAI()
     mcp = fastmcp.Client({"mcpServers": cfg.to_fastmcp()})
     async with mcp:
-        tools = [
-            {
-                "type": "function",
-                "name": t.name,
-                "description": t.description,
-                "parameters": t.inputSchema,
-                "strict": True,
-            }
-            for t in await mcp.list_tools()
-        ]
+        tools = await build_tools(mcp)
 
         messages = [
             {"role": "system", "content": cfg.system_prompt},
