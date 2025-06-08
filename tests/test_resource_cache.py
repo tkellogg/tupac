@@ -1,6 +1,6 @@
 import pytest
 from collections import namedtuple
-from tupac.cli import ResourceCache, _process_tool_result
+from tupac.resource_cache import ResourceCache, _process_tool_result
 
 
 # Mock FastMCP TextContent
