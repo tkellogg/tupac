@@ -1,10 +1,15 @@
 import asyncio
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Protocol
 
 import fastmcp
 
 
-async def build_tools(mcp: fastmcp.Client) -> List[dict]:
+class MCPClientProtocol(Protocol):
+    async def list_tools(self) -> List[Any]:
+        ...
+
+
+async def build_tools(mcp: MCPClientProtocol) -> List[dict]:
     """Return tool definitions compatible with the OpenAI Responses API."""
     tools: List[dict] = []
     for t in await mcp.list_tools():

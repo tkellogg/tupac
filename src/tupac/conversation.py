@@ -1,20 +1,26 @@
 import json
-from typing import Any, List
+from typing import Any, List, Protocol
 
 import fastmcp
+import fastmcp.exceptions
 from rich.console import Console
 
 from .resource_cache import ResourceCache, _process_tool_result
 from .tool_processing import fetch_response
 
 
+class MCPClientProtocol(Protocol):
+    async def call_tool(self, name: str, args: dict) -> Any:
+        ...
+
+
 console = Console()
 
 
 async def conversation_loop(
-    client,
-    mcp: fastmcp.Client,
-    cfg,
+    client: Any,
+    mcp: MCPClientProtocol,
+    cfg: Any,
     messages: List[Any],
     tools: List[dict],
     cache: ResourceCache,

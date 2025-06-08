@@ -10,6 +10,9 @@ from tupac.resource_cache import ResourceCache
 from tupac.tool_processing import build_tools
 import fastmcp
 
+import dotenv
+dotenv.load_dotenv()
+
 
 class DummyMCP:
     async def call_tool(self, name: str, args: dict) -> dict:
