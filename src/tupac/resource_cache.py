@@ -7,6 +7,7 @@ class ResourceCache:
     def __init__(self, capacity: int = 100) -> None:
         self.capacity = capacity
         self.cache: OrderedDict[str, Dict[str, str]] = OrderedDict()
+        self._sent_content: set[str] = set()
         self._changed = False
 
     def contains(self, uri: str) -> bool:
@@ -19,25 +20,39 @@ class ResourceCache:
         self.cache[uri] = {"title": title, "type": type_, "text": text}
         self._changed = True
         if len(self.cache) > self.capacity:
-            self.cache.popitem(last=False)
+            evicted_uri, _ = self.cache.popitem(last=False)
+            self._sent_content.discard(evicted_uri)
 
 
     def consume_changed_blocks(self) -> list[str]:
         if not self._changed:
             return []
         self._changed = False
+        
+        # Always send all resource references
         resources = "\n".join(
             f'<resource uri="{uri}" title="{v["title"]}" type="{v["type"]}"/>'
             for uri, v in self.cache.items()
         )
-        details = "\n".join(
-            f'<resource uri="{uri}">{v["text"]}</resource>'
-            for uri, v in self.cache.items()
-        )
-        return [
-            f"<resources>{resources}</resources>",
-            f"<resource_details>{details}</resource_details>",
-        ]
+        
+        # Only send content for resources that haven't had their content sent before
+        unsent_content_uris = [uri for uri in self.cache.keys() if uri not in self._sent_content]
+        
+        if unsent_content_uris:
+            details = "\n".join(
+                f'<resource uri="{uri}">{self.cache[uri]["text"]}</resource>'
+                for uri in unsent_content_uris
+            )
+            # Mark these as having had content sent
+            self._sent_content.update(unsent_content_uris)
+            
+            return [
+                f"<resources>{resources}</resources>",
+                f"<resource_details>{details}</resource_details>",
+            ]
+        else:
+            # Only send references, no content
+            return [f"<resources>{resources}</resources>"]
 
 
 def _process_tool_result(result: Any, cache: ResourceCache) -> str:

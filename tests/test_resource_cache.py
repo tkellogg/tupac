@@ -41,11 +41,27 @@ def test_consume_changed_blocks_generation():
     cache = ResourceCache()
     cache.add("test://uri", "Test Title", "text/plain", "Test content")
     
+    # First consume should return references + content
     blocks = cache.consume_changed_blocks()
-    
     assert len(blocks) == 2
     assert '<resource uri="test://uri" title="Test Title" type="text/plain"/>' in blocks[0]
     assert '<resource uri="test://uri">Test content</resource>' in blocks[1]
+    
+    # Second consume should return nothing (no changes)
+    blocks2 = cache.consume_changed_blocks()
+    assert len(blocks2) == 0
+    
+    # Adding a new resource should send all references + only new content
+    cache.add("test://different", "Test Title 2", "text/html", "Completely different content")
+    blocks3 = cache.consume_changed_blocks()
+    assert len(blocks3) == 2
+    # Should include both resource references
+    assert 'test://uri' in blocks3[0]
+    assert 'test://different' in blocks3[0]
+    # Should only include new content
+    assert 'test://different' in blocks3[1]
+    assert 'Completely different content' in blocks3[1]
+    assert 'Test content' not in blocks3[1]  # Should not re-send old content
 
 
 def test_process_fastmcp_text_content():
