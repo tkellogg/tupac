@@ -1,6 +1,4 @@
 import json
-import time
-import mimetypes
 from pathlib import Path
 from dataclasses import dataclass
 from typing import Any, Dict, List
@@ -23,7 +21,6 @@ console = Console()
 OUTPUT_DIR = Path("outputs")
 OUTPUT_DIR.mkdir(exist_ok=True)
 
-BINARY_TYPES = {"image", "pdf", "audio", "video", "blob"}
 
 
 @dataclass
@@ -69,12 +66,6 @@ class Config:
 
 
 
-def save_blob(data: bytes, mime_type: str) -> Path:
-    ts = time.strftime("%Y-%m-%dT%H-%M-%S")
-    ext = mimetypes.guess_extension(mime_type) or ".bin"
-    path = OUTPUT_DIR / f"out_{ts}{ext}"
-    path.write_bytes(data)
-    return path
 
 
 

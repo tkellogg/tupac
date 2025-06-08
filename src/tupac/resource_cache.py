@@ -21,7 +21,11 @@ class ResourceCache:
         if len(self.cache) > self.capacity:
             self.cache.popitem(last=False)
 
-    def xml_blocks(self) -> tuple[str, str]:
+
+    def consume_changed_blocks(self) -> list[str]:
+        if not self._changed:
+            return []
+        self._changed = False
         resources = "\n".join(
             f'<resource uri="{uri}" title="{v["title"]}" type="{v["type"]}"/>'
             for uri, v in self.cache.items()
@@ -30,16 +34,10 @@ class ResourceCache:
             f'<resource uri="{uri}">{v["text"]}</resource>'
             for uri, v in self.cache.items()
         )
-        return (
+        return [
             f"<resources>{resources}</resources>",
             f"<resource_details>{details}</resource_details>",
-        )
-
-    def consume_changed_blocks(self) -> list[str]:
-        if not self._changed:
-            return []
-        self._changed = False
-        return list(self.xml_blocks())
+        ]
 
 
 def _process_tool_result(result: Any, cache: ResourceCache) -> str:

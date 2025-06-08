@@ -4,7 +4,10 @@ import pytest
 import os
 import openai
 
-from tupac.cli import Config, conversation_loop, ResourceCache, build_tools
+from tupac.cli import Config
+from tupac.conversation import conversation_loop
+from tupac.resource_cache import ResourceCache
+from tupac.tool_processing import build_tools
 import fastmcp
 
 
@@ -32,7 +35,7 @@ class ErrorMCP:
 
 @pytest.mark.asyncio
 async def test_conversation_simple():
-    items = [DummyItem(type="message", content=[{"type": "output_text", "text": "hi"}])]
+    items = [DummyItem(content="hi", tool_calls=None)]
     client = DummyClient(items)
     cfg = Config(system_prompt="You are a helpful assistant.", mcp_servers={})
     messages = [
@@ -50,10 +53,23 @@ async def test_conversation_simple():
     assert len(messages) > 2
 
 
+class DummyToolCall:
+    def __init__(self, id, name, arguments):
+        self.id = id
+        self.function = DummyFunction(name, arguments)
+
+class DummyFunction:
+    def __init__(self, name, arguments):
+        self.name = name
+        self.arguments = arguments
+
 class DummyItem:
     def __init__(self, **kw) -> None:
         for k, v in kw.items():
             setattr(self, k, v)
+        # Ensure tool_calls exists
+        if not hasattr(self, 'tool_calls'):
+            self.tool_calls = None
 
 
 class DummyResponse:
@@ -61,22 +77,42 @@ class DummyResponse:
         self.output = items
 
 
+class DummyChoice:
+    def __init__(self, item):
+        self.message = item
+
+class DummyResponse:
+    def __init__(self, item):
+        self.choices = [DummyChoice(item)]
+
+class DummyCompletions:
+    def __init__(self, items):
+        self._items = items
+        self._index = 0
+
+    async def create(self, *args, **kwargs):
+        if self._index < len(self._items):
+            item = self._items[self._index]
+            self._index += 1
+            return DummyResponse(item)
+        return DummyResponse(DummyItem(content="done", tool_calls=None))
+
+class DummyChat:
+    def __init__(self, items):
+        self.completions = DummyCompletions(items)
+
 class DummyClient:
     def __init__(self, items):
         self._items = items
-        self.responses = self
-
-    async def create(self, *args, **kwargs):
-        return DummyResponse(self._items)
+        self.chat = DummyChat(items)
 
 
 @pytest.mark.asyncio
 async def test_tool_success():
+    tool_call = DummyToolCall("1", "echo", '{"text": "hi"}')
     items = [
-        DummyItem(
-            type="function_call", id="1", name="echo", arguments='{"text": "hi"}'
-        ),
-        DummyItem(type="message", content=[{"type": "output_text", "text": "done"}]),
+        DummyItem(content=None, tool_calls=[tool_call]),
+        DummyItem(content="done", tool_calls=None),
     ]
     client = DummyClient(items)
     cfg = Config(system_prompt="you", mcp_servers={})
@@ -94,19 +130,17 @@ async def test_tool_success():
     )
     assert any(
         isinstance(m, dict)
-        and m.get("type") == "function_call_output"
-        and not m.get("is_error")
+        and m.get("role") == "tool"
         for m in messages
     )
 
 
 @pytest.mark.asyncio
 async def test_tool_error():
+    tool_call = DummyToolCall("1", "echo", '{"text": "hi"}')
     items = [
-        DummyItem(
-            type="function_call", id="1", name="echo", arguments='{"text": "hi"}'
-        ),
-        DummyItem(type="message", content=[{"type": "output_text", "text": "done"}]),
+        DummyItem(content=None, tool_calls=[tool_call]),
+        DummyItem(content="done", tool_calls=None),
     ]
     client = DummyClient(items)
     cfg = Config(system_prompt="you", mcp_servers={})
@@ -124,8 +158,8 @@ async def test_tool_error():
     )
     assert any(
         isinstance(m, dict)
-        and m.get("type") == "function_call_output"
-        and m.get("is_error")
+        and m.get("role") == "tool"
+        and "boom" in m.get("content", "")
         for m in messages
     )
 
@@ -164,7 +198,7 @@ async def test_build_tools_missing_required(monkeypatch):
             ]
 
     tools = await build_tools(MCPT())
-    params = tools[0]["parameters"]
+    params = tools[0]["function"]["parameters"]
     assert params["required"] == ["a"]
     assert params["type"] == "object"
 

@@ -37,14 +37,15 @@ def test_cache_capacity_limit():
     assert cache.contains("uri3")
 
 
-def test_xml_blocks_generation():
+def test_consume_changed_blocks_generation():
     cache = ResourceCache()
     cache.add("test://uri", "Test Title", "text/plain", "Test content")
     
-    resources, details = cache.xml_blocks()
+    blocks = cache.consume_changed_blocks()
     
-    assert '<resource uri="test://uri" title="Test Title" type="text/plain"/>' in resources
-    assert '<resource uri="test://uri">Test content</resource>' in details
+    assert len(blocks) == 2
+    assert '<resource uri="test://uri" title="Test Title" type="text/plain"/>' in blocks[0]
+    assert '<resource uri="test://uri">Test content</resource>' in blocks[1]
 
 
 def test_process_fastmcp_text_content():
