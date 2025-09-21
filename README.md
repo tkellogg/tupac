@@ -1,6 +1,7 @@
 # tupac
-A GPT wrapper with MCP support. It's a thin layer around the OpenAI [responses][api] API
-with functions being specified as MCP config.
+A GPT wrapper with MCP support. Requests are routed through [LiteLLM](https://github.com/BerriAI/litellm)'s
+Responses API helper so you can talk to OpenAI, Azure OpenAI, Anthropic, or any of the other
+backends it supports, with functions being specified as MCP config.
 
 You can write a simple "LLM app" very quickly, by specifying MCP config and a system prompt.
 
@@ -44,12 +45,32 @@ Configuration format follows the standard MCP schema:
 }
 ```
 
+To use an alternative provider you can add a `provider` block. This example switches to
+Anthropic while keeping the same MCP configuration:
+
+```json
+{
+  "instructions": "Use search to answer questions.",
+  "model": "claude-3-5-sonnet-latest",
+  "provider": {
+    "name": "anthropic",
+    "api_key": "${ANTHROPIC_API_KEY}"
+  },
+  "mcpServers": {
+    "exa": {
+      "type": "url",
+      "url": "https://mcp.exa.ai/mcp?exaApiKey=${EXA_API_KEY}"
+    }
+  }
+}
+```
+
 ### Environment Variables
 You can use that `${EXA_API_KEY}` syntax to reference environment variables in the config file. It
 does load [`.env` files][env], but it loads it from the current directory, wherever you are.
 
 Required environment variables
-* `OPENAI_API_KEY`
+* whichever credential your chosen provider needs (for OpenAI this is `OPENAI_API_KEY`)
 
 Variables required to run `configs/web-search.json`:
 * `EXA_API_KEY` — find it [here](https://docs.exa.ai/reference/getting-started)
