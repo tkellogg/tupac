@@ -1,12 +1,12 @@
 import json
-from typing import Any, List, Protocol
+from typing import Any, Awaitable, Callable, List, Protocol
 
 import fastmcp
 import fastmcp.exceptions
 from rich.console import Console
 
 from .resource_cache import ResourceCache, _process_tool_result
-from .tool_processing import fetch_response
+from .tool_processing import AssistantTurn
 
 
 class MCPClientProtocol(Protocol):
@@ -18,7 +18,7 @@ console = Console()
 
 
 async def conversation_loop(
-    client: Any,
+    responder: Callable[..., Awaitable[AssistantTurn]],
     mcp: MCPClientProtocol,
     cfg: Any,
     messages: List[Any],
@@ -26,22 +26,26 @@ async def conversation_loop(
     cache: ResourceCache,
     verbose: bool = False,
 ) -> None:
+    async def handle_event(event_type: str, payload: Any) -> None:
+        if event_type == "reasoning" and payload:
+            console.print(payload, style="grey42")
+        elif event_type == "tool_call":
+            call = payload
+            console.print(
+                f"Tool call: {call.function.name}({call.function.arguments})",
+                style="yellow",
+            )
+
     while True:
         for block in cache.consume_changed_blocks():
             messages.append({"role": "user", "content": block})
 
-        resp = await fetch_response(client, cfg, messages, tools)
+        assistant_turn = await responder(cfg, messages, tools, on_event=handle_event)
 
-        response_message = resp.choices[0].message
-        messages.append(response_message)
-        
-        # Show reasoning if available
-        if hasattr(response_message, 'reasoning') and response_message.reasoning:
-            console.print(response_message.reasoning, style="grey42")
-        
-        if response_message.tool_calls:
-            for tool_call in response_message.tool_calls:
-                console.print(f"Tool call: {tool_call.function.name}({tool_call.function.arguments})", style="yellow")
+        messages.append(assistant_turn.to_message_dict())
+
+        if assistant_turn.tool_calls:
+            for tool_call in assistant_turn.tool_calls:
                 try:
                     result = await mcp.call_tool(
                         tool_call.function.name,
@@ -49,10 +53,9 @@ async def conversation_loop(
                     )
                     if verbose:
                         console.print(str(result), style="magenta")
-                    
-                    # Handle tool result - could be single result or array
+
                     tool_content = _process_tool_result(result, cache)
-                    
+
                     messages.append(
                         {
                             "role": "tool",
@@ -69,5 +72,6 @@ async def conversation_loop(
                         }
                     )
         else:
-            console.print(response_message.content, style="cyan")
+            if assistant_turn.content:
+                console.print(assistant_turn.content, style="cyan")
             return

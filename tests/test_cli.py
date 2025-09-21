@@ -1,16 +1,17 @@
-import asyncio
-from pathlib import Path
-import pytest
+import inspect
 import os
-import openai
+from pathlib import Path
+
+import fastmcp
+import pytest
 
 from tupac.cli import Config
 from tupac.conversation import conversation_loop
 from tupac.resource_cache import ResourceCache
-from tupac.tool_processing import build_tools
-import fastmcp
+from tupac.tool_processing import AssistantTurn, ToolCall, ToolCallFunction, build_tools, fetch_response
 
 import dotenv
+
 dotenv.load_dotenv()
 
 
@@ -36,10 +37,41 @@ class ErrorMCP:
         raise ClientError("boom")
 
 
+async def _maybe_emit(callback, event_type: str, payload):
+    if callback is None:
+        return
+    result = callback(event_type, payload)
+    if inspect.isawaitable(result):
+        await result
+
+
+class DummyResponder:
+    def __init__(self, turns: list[AssistantTurn]):
+        self._turns = turns
+        self._index = 0
+
+    async def __call__(self, cfg, messages, tools, *, on_event=None):
+        if self._index < len(self._turns):
+            turn = self._turns[self._index]
+            self._index += 1
+        else:
+            turn = AssistantTurn(content="done")
+
+        if on_event:
+            if turn.reasoning:
+                for chunk in turn.reasoning:
+                    await _maybe_emit(on_event, "reasoning", chunk)
+            for call in turn.tool_calls:
+                await _maybe_emit(on_event, "tool_call", call)
+            if turn.content:
+                await _maybe_emit(on_event, "message", turn.content)
+
+        return turn
+
+
 @pytest.mark.asyncio
 async def test_conversation_simple():
-    items = [DummyItem(content="hi", tool_calls=None)]
-    client = DummyClient(items)
+    client = DummyResponder([AssistantTurn(content="hi")])
     cfg = Config(system_prompt="You are a helpful assistant.", mcp_servers={})
     messages = [
         {"role": "system", "content": cfg.system_prompt},
@@ -56,68 +88,15 @@ async def test_conversation_simple():
     assert len(messages) > 2
 
 
-class DummyToolCall:
-    def __init__(self, id, name, arguments):
-        self.id = id
-        self.function = DummyFunction(name, arguments)
-
-class DummyFunction:
-    def __init__(self, name, arguments):
-        self.name = name
-        self.arguments = arguments
-
-class DummyItem:
-    def __init__(self, **kw) -> None:
-        for k, v in kw.items():
-            setattr(self, k, v)
-        # Ensure tool_calls exists
-        if not hasattr(self, 'tool_calls'):
-            self.tool_calls = None
-
-
-class DummyResponse:
-    def __init__(self, items):
-        self.output = items
-
-
-class DummyChoice:
-    def __init__(self, item):
-        self.message = item
-
-class DummyResponse:
-    def __init__(self, item):
-        self.choices = [DummyChoice(item)]
-
-class DummyCompletions:
-    def __init__(self, items):
-        self._items = items
-        self._index = 0
-
-    async def create(self, *args, **kwargs):
-        if self._index < len(self._items):
-            item = self._items[self._index]
-            self._index += 1
-            return DummyResponse(item)
-        return DummyResponse(DummyItem(content="done", tool_calls=None))
-
-class DummyChat:
-    def __init__(self, items):
-        self.completions = DummyCompletions(items)
-
-class DummyClient:
-    def __init__(self, items):
-        self._items = items
-        self.chat = DummyChat(items)
-
-
 @pytest.mark.asyncio
 async def test_tool_success():
-    tool_call = DummyToolCall("1", "echo", '{"text": "hi"}')
-    items = [
-        DummyItem(content=None, tool_calls=[tool_call]),
-        DummyItem(content="done", tool_calls=None),
-    ]
-    client = DummyClient(items)
+    tool_call = ToolCall("1", ToolCallFunction("echo", '{"text": "hi"}'))
+    client = DummyResponder(
+        [
+            AssistantTurn(content=None, tool_calls=[tool_call]),
+            AssistantTurn(content="done"),
+        ]
+    )
     cfg = Config(system_prompt="you", mcp_servers={})
     messages = [
         {"role": "system", "content": "you"},
@@ -140,12 +119,13 @@ async def test_tool_success():
 
 @pytest.mark.asyncio
 async def test_tool_error():
-    tool_call = DummyToolCall("1", "echo", '{"text": "hi"}')
-    items = [
-        DummyItem(content=None, tool_calls=[tool_call]),
-        DummyItem(content="done", tool_calls=None),
-    ]
-    client = DummyClient(items)
+    tool_call = ToolCall("1", ToolCallFunction("echo", '{"text": "hi"}'))
+    client = DummyResponder(
+        [
+            AssistantTurn(content=None, tool_calls=[tool_call]),
+            AssistantTurn(content="done"),
+        ]
+    )
     cfg = Config(system_prompt="you", mcp_servers={})
     messages = [
         {"role": "system", "content": "you"},
@@ -214,9 +194,8 @@ async def test_openai_integration():
         {"role": "system", "content": cfg.system_prompt},
         {"role": "user", "content": "Hello"},
     ]
-    client = openai.AsyncOpenAI()
     await conversation_loop(
-        client,
+        fetch_response,
         DummyMCP(),
         cfg,
         messages,
